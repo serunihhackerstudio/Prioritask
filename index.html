@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#4f46e5">
-    <title>Prioritask — Kelola Tugas dengan Fokus</title>
+    <title>Prioritask</title>
+    <meta name="description" content="Prioritask — kelola tugas harian berdasarkan prioritas, dengan timer fokus dan sinkronisasi Google Sheets.">
+    <link id="app-favicon" rel="icon" type="image/svg+xml" href="favicon.svg">
 
     <!-- Terapkan tema sedini mungkin agar tidak berkedip -->
     <script>
@@ -1031,6 +1033,7 @@ function doPost(e) {
             root.style.setProperty('--color-accent-500', hexToRgbString(p.accent));
             const meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute('content', p[600]);
+            updateFavicon(p[500], p[700]);
 
             Object.keys(COLOR_PALETTES).forEach(key => {
                 const btn = $(`color-opt-${key}`);
@@ -1043,6 +1046,32 @@ function doPost(e) {
             if (!isPreset && $('custom-color-picker')) $('custom-color-picker').value = colorName;
         }
         function handleCustomColor(val) { setBaseColor(val); }
+
+        // Favicon mengikuti warna aksen: kotak gradasi + centang + titik prioritas
+        function updateFavicon(from, to) {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect x="2" y="2" width="60" height="60" rx="16" fill="url(#g)"/><path d="M18 33.5l9 9L46 23" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="14" r="7" fill="#fbbf24" stroke="${to}" stroke-width="3"/></svg>`;
+            const link = document.getElementById('app-favicon');
+            if (link) link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+        }
+
+        // Judul tab: timer saat fokus, jumlah tugas aktif, atau status terkunci
+        function updateDocumentTitle() {
+            let title = 'Prioritask';
+            if (appLocked) {
+                title = 'Prioritask · Terkunci';
+            } else {
+                const running = tasks.find(t => t.inProgress && !t.completed);
+                const active = tasks.filter(t => !t.completed).length;
+                if (running) {
+                    let remaining = running.remainingMs ?? running.duration * HOUR_MS;
+                    if (running.lastStartedAt) remaining = Math.max(0, remaining - (Date.now() - running.lastStartedAt));
+                    title = `${remaining > 0 ? formatDuration(remaining) : 'Waktu habis'} · ${truncate(running.title, 24)}`;
+                } else if (active > 0) {
+                    title = `(${active}) Prioritask`;
+                }
+            }
+            if (document.title !== title) document.title = title;
+        }
 
         function setAppLogo(logoClass) {
             selectedLogo = logoClass;
@@ -1578,6 +1607,7 @@ function doPost(e) {
                 : '0 tugas';
 
             renderFocusCard();
+            updateDocumentTitle();
 
             if (filtered.length === 0) {
                 const isFiltering = keyword || activeFilter !== 'Semua';
@@ -1708,6 +1738,7 @@ function doPost(e) {
 
         // ---------- Countdown ----------
         function tickCountdowns() {
+            updateDocumentTitle();
             document.querySelectorAll('.task-countdown-element').forEach(el => {
                 const inProgress = el.dataset.inProgress === 'true';
                 let remaining = parseInt(el.dataset.remainingMs) || 0;
@@ -1816,6 +1847,7 @@ function doPost(e) {
             appLocked = false; enteredPin = ''; updatePinDots(); lastActivityTime = Date.now();
             $('pin-lock-screen').classList.add('opacity-0', 'pointer-events-none');
             $('pin-lock-screen').setAttribute('aria-hidden', 'true');
+            updateDocumentTitle();
         }
         function lockApp(reason = 'Terkunci otomatis karena tidak ada aktivitas') {
             appLocked = true; enteredPin = ''; updatePinDots();
@@ -1824,6 +1856,7 @@ function doPost(e) {
             $('lock-reason').classList.remove('text-rose-300');
             $('pin-lock-screen').classList.remove('opacity-0', 'pointer-events-none');
             $('pin-lock-screen').setAttribute('aria-hidden', 'false');
+            updateDocumentTitle();
         }
         function logout() { lockApp('Aplikasi dikunci. Masukkan PIN untuk kembali.'); }
 
