@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#4f46e5">
-    <title>Prioritask — Kelola Tugas dengan Fokus</title>
+    <title>Prioritask</title>
+    <meta name="description" content="Prioritask — kelola tugas harian berdasarkan prioritas, dengan timer fokus dan sinkronisasi Google Sheets.">
+    <link id="app-favicon" rel="icon" type="image/svg+xml" href="favicon.svg">
 
     <!-- Terapkan tema sedini mungkin agar tidak berkedip -->
     <script>
@@ -562,6 +564,14 @@
                             <button type="button" class="chip" data-offset="7" onclick="setDateOffset(7)">Minggu depan</button>
                         </div>
                     </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="task-notes" class="label !mb-0">Catatan <span class="font-normal text-slate-400 dark:text-zinc-500">(opsional)</span></label>
+                            <span id="notes-counter" class="text-[11px] text-slate-400 dark:text-zinc-500 tabular">0/1000</span>
+                        </div>
+                        <textarea id="task-notes" rows="4" maxlength="1000" oninput="updateNotesCounter()" placeholder="Tambahkan detail, link, atau langkah-langkah yang perlu diingat…" class="input resize-y min-h-[96px] leading-relaxed"></textarea>
+                    </div>
                 </div>
 
                 <div class="border-t border-slate-100 dark:border-white/5 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] flex gap-3">
@@ -628,7 +638,8 @@ function doGet(e) {
       tasks.push({
         id: rows[i][0], title: rows[i][1], priority: rows[i][2],
         duration: rows[i][3], category: rows[i][4], targetDate: rows[i][5],
-        completed: rows[i][6] === true || rows[i][6] === "true"
+        completed: rows[i][6] === true || rows[i][6] === "true",
+        notes: rows[i][7] || ""
       });
     }
   }
@@ -656,21 +667,24 @@ function doPost(e) {
   }
 
   if (taskSheet.getLastRow() == 0) {
-    taskSheet.appendRow(["ID", "Title", "Priority", "Duration", "Category", "TargetDate", "Completed"]);
+    taskSheet.appendRow(["ID", "Title", "Priority", "Duration", "Category", "TargetDate", "Completed", "Notes"]);
+  } else if (taskSheet.getRange(1, 8).getValue() === "") {
+    taskSheet.getRange(1, 8).setValue("Notes");
   }
   var rows = taskSheet.getDataRange().getValues();
 
   if (action === "create") {
-    taskSheet.appendRow([data.id, data.title, data.priority, data.duration, data.category, data.targetDate, data.completed]);
+    taskSheet.appendRow([data.id, asText(data.title), data.priority, data.duration, data.category, data.targetDate, data.completed, asText(data.notes)]);
   } else if (action === "update") {
     for (var i = 1; i < rows.length; i++) {
       if (rows[i][0] == data.id) {
-        taskSheet.getRange(i + 1, 2).setValue(data.title);
+        taskSheet.getRange(i + 1, 2).setValue(asText(data.title));
         taskSheet.getRange(i + 1, 3).setValue(data.priority);
         taskSheet.getRange(i + 1, 4).setValue(data.duration);
         taskSheet.getRange(i + 1, 5).setValue(data.category);
         taskSheet.getRange(i + 1, 6).setValue(data.targetDate);
         taskSheet.getRange(i + 1, 7).setValue(data.completed);
+        taskSheet.getRange(i + 1, 8).setValue(asText(data.notes));
         break;
       }
     }
@@ -683,6 +697,12 @@ function doPost(e) {
     }
   }
   return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Simpan teks apa adanya (cegah teks seperti "=..." dibaca sebagai rumus)
+function asText(value) {
+  var text = value == null ? "" : String(value);
+  return /^[=+\-@]/.test(text) ? "'" + text : text;
 }</pre>
                                     <button onclick="copyScriptCode()" class="absolute right-2 top-2 bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition">
                                         <i class="fa-regular fa-copy"></i>Salin
@@ -693,6 +713,10 @@ function doPost(e) {
                         <li class="flex gap-3">
                             <span class="w-6 h-6 rounded-full bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 text-xs font-bold grid place-items-center shrink-0">4</span>
                             <p class="text-sm pt-0.5">Klik <span class="font-semibold">Terapkan → Penerapan baru → Aplikasi Web</span>, atur akses ke <span class="font-semibold">Siapa saja</span>, lalu tempel URL-nya di atas.</p>
+                        </li>
+                        <li class="flex gap-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 p-3">
+                            <i class="fa-solid fa-circle-info mt-0.5 shrink-0"></i>
+                            <p class="text-xs leading-relaxed"><span class="font-semibold">Sudah memakai skrip versi lama?</span> Tempel ulang skrip di atas (kini dengan kolom <span class="font-mono">Notes</span> untuk catatan), lalu buka <span class="font-semibold">Terapkan → Kelola penerapan → Edit → Versi baru → Terapkan</span>. URL Web App tetap sama.</p>
                         </li>
                     </ol>
                 </div>
@@ -853,6 +877,7 @@ function doPost(e) {
         let bannerSubtitle = 'Mari selesaikan rencana tugas hari ini dengan terstruktur. Data tersinkronisasi instan ke Spreadsheet Anda.';
 
         const pendingDeletes = {};
+        const expandedNotes = new Set();
         const modalStack = [];
 
         const STORAGE_KEY_TASKS = 'prioritask_local_tasks';
@@ -1031,6 +1056,7 @@ function doPost(e) {
             root.style.setProperty('--color-accent-500', hexToRgbString(p.accent));
             const meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute('content', p[600]);
+            updateFavicon(p[500], p[700]);
 
             Object.keys(COLOR_PALETTES).forEach(key => {
                 const btn = $(`color-opt-${key}`);
@@ -1043,6 +1069,32 @@ function doPost(e) {
             if (!isPreset && $('custom-color-picker')) $('custom-color-picker').value = colorName;
         }
         function handleCustomColor(val) { setBaseColor(val); }
+
+        // Favicon mengikuti warna aksen: kotak gradasi + centang + titik prioritas
+        function updateFavicon(from, to) {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect x="2" y="2" width="60" height="60" rx="16" fill="url(#g)"/><path d="M18 33.5l9 9L46 23" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="14" r="7" fill="#fbbf24" stroke="${to}" stroke-width="3"/></svg>`;
+            const link = document.getElementById('app-favicon');
+            if (link) link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+        }
+
+        // Judul tab: timer saat fokus, jumlah tugas aktif, atau status terkunci
+        function updateDocumentTitle() {
+            let title = 'Prioritask';
+            if (appLocked) {
+                title = 'Prioritask · Terkunci';
+            } else {
+                const running = tasks.find(t => t.inProgress && !t.completed);
+                const active = tasks.filter(t => !t.completed).length;
+                if (running) {
+                    let remaining = running.remainingMs ?? running.duration * HOUR_MS;
+                    if (running.lastStartedAt) remaining = Math.max(0, remaining - (Date.now() - running.lastStartedAt));
+                    title = `${remaining > 0 ? formatDuration(remaining) : 'Waktu habis'} · ${truncate(running.title, 24)}`;
+                } else if (active > 0) {
+                    title = `(${active}) Prioritask`;
+                }
+            }
+            if (document.title !== title) document.title = title;
+        }
 
         function setAppLogo(logoClass) {
             selectedLogo = logoClass;
@@ -1135,6 +1187,9 @@ function doPost(e) {
             $('task-duration').style.setProperty('--fill', `${((val - 1) / 23) * 100}%`);
             document.querySelectorAll('#duration-chips [data-duration]').forEach(c => c.setAttribute('aria-pressed', String(parseInt(c.dataset.duration) === val)));
         }
+        function updateNotesCounter() {
+            $('notes-counter').innerText = `${$('task-notes').value.length}/1000`;
+        }
         function setDuration(val) { $('task-duration').value = val; updateDurationDisplay(val); }
 
         function setDateOffset(n) { $('task-target-date').value = addDays(n); syncDateChips(); }
@@ -1148,6 +1203,8 @@ function doPost(e) {
             $('form-subtitle').innerText = 'Lengkapi detail lalu simpan';
             $('task-id').value = '';
             $('task-title').value = '';
+            $('task-notes').value = '';
+            updateNotesCounter();
             setRadio('task-priority', 'Sedang');
             setRadio('task-category', activeCategory);
             setDuration(1);
@@ -1165,6 +1222,8 @@ function doPost(e) {
             $('form-subtitle').innerText = 'Perbarui detail tugas Anda';
             $('task-id').value = task.id;
             $('task-title').value = task.title;
+            $('task-notes').value = task.notes || '';
+            updateNotesCounter();
             setRadio('task-priority', task.priority);
             setRadio('task-category', task.category);
             setDuration(task.duration);
@@ -1298,7 +1357,8 @@ function doPost(e) {
                     duration: parseInt(item.duration) || 1,
                     category: item.category === 'Rumah' ? 'Rumah' : 'Kantor',
                     targetDate: normalizeDate(item.targetDate),
-                    completed: item.completed === true || item.completed === 'true'
+                    completed: item.completed === true || item.completed === 'true',
+                    notes: item.notes == null ? undefined : String(item.notes)
                 }));
 
             if (fetchedParams && Object.keys(fetchedParams).length > 0) {
@@ -1320,6 +1380,8 @@ function doPost(e) {
                 task.remainingMs = (local && local.remainingMs !== undefined) ? local.remainingMs : task.duration * HOUR_MS;
                 if (local && local.lastStartedAt !== undefined && local.lastStartedAt !== null) task.lastStartedAt = local.lastStartedAt;
                 else task.lastStartedAt = task.inProgress ? Date.now() : null;
+                // Skrip Apps Script lama belum punya kolom Notes: pakai catatan lokal
+                if (task.notes === undefined) task.notes = (local && local.notes) || '';
             });
 
             updateBannerUI();
@@ -1348,10 +1410,10 @@ function doPost(e) {
         }
 
         // ---------- CRUD tugas ----------
-        function buildTaskPayload({ id, title, priority, duration, category, targetDate }) {
+        function buildTaskPayload({ id, title, priority, duration, category, targetDate, notes = '' }) {
             return {
                 id: id || 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11),
-                title, priority, duration, category, targetDate,
+                title, priority, duration, category, targetDate, notes,
                 completed: false, inProgress: false,
                 remainingMs: duration * HOUR_MS,
                 lastStartedAt: null
@@ -1393,7 +1455,8 @@ function doPost(e) {
                 priority: getRadio('task-priority') || 'Sedang',
                 duration: parseInt($('task-duration').value) || 1,
                 category: getRadio('task-category') || activeCategory,
-                targetDate: $('task-target-date').value || localISODate()
+                targetDate: $('task-target-date').value || localISODate(),
+                notes: $('task-notes').value.trim()
             });
             const isEdit = !!id;
 
@@ -1435,7 +1498,8 @@ function doPost(e) {
         function afterTaskSaved(task) {
             // Pastikan tugas yang baru disimpan terlihat
             const search = $('search-input');
-            if (search.value && !task.title.toLowerCase().includes(search.value.toLowerCase().trim())) search.value = '';
+            const kw = search.value.toLowerCase().trim();
+            if (kw && !task.title.toLowerCase().includes(kw) && !(task.notes || '').toLowerCase().includes(kw)) search.value = '';
             if (activeFilter !== 'Semua' && activeFilter !== task.priority) { activeFilter = 'Semua'; syncFilterChips(); }
             if (task.category !== activeCategory) changeCategoryTab(task.category);
             else { filterAndRenderTasks(); updateStatistics(); }
@@ -1564,7 +1628,7 @@ function doPost(e) {
 
             let filtered = tasks.filter(t => t.category === activeCategory);
             if (activeFilter !== 'Semua') filtered = filtered.filter(t => t.priority === activeFilter);
-            if (keyword) filtered = filtered.filter(t => t.title.toLowerCase().includes(keyword));
+            if (keyword) filtered = filtered.filter(t => t.title.toLowerCase().includes(keyword) || (t.notes || '').toLowerCase().includes(keyword));
 
             // Urutan: sedang dikerjakan → aktif → selesai
             const rank = t => t.completed ? 2 : (t.inProgress ? 0 : 1);
@@ -1578,6 +1642,7 @@ function doPost(e) {
                 : '0 tugas';
 
             renderFocusCard();
+            updateDocumentTitle();
 
             if (filtered.length === 0) {
                 const isFiltering = keyword || activeFilter !== 'Semua';
@@ -1634,6 +1699,7 @@ function doPost(e) {
                 </button>
                 <div class="flex-1 min-w-0">
                     <h4 class="text-[15px] leading-snug break-words ${done ? 'line-through text-slate-400 dark:text-zinc-500 font-medium' : 'font-semibold text-slate-800 dark:text-zinc-100'}">${title}</h4>
+                    ${renderNote(task)}
                     <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-zinc-400">
                         <span class="inline-flex items-center gap-1.5 font-semibold ${done ? '' : P.text}"><span class="w-1.5 h-1.5 rounded-full ${P.dot}"></span>${P.label}</span>
                         <span class="inline-flex items-center gap-1.5 ${overdue ? 'text-rose-600 dark:text-rose-400 font-semibold' : ''}"><i class="fa-regular ${overdue ? 'fa-calendar-xmark' : 'fa-calendar'}"></i>${formatDateString(dateStr)}${overdue ? ' · Terlambat' : ''}</span>
@@ -1659,6 +1725,34 @@ function doPost(e) {
                     <button type="button" data-action="delete" class="icon-btn reveal hover:!text-rose-600 hover:!bg-rose-50 dark:hover:!bg-rose-500/10" title="Hapus tugas" aria-label="Hapus tugas"><i class="fa-regular fa-trash-can text-xs"></i></button>
                 </div>
             </article>`;
+        }
+
+        function renderNote(task) {
+            const note = (task.notes || '').trim();
+            if (!note) return '';
+            const expanded = expandedNotes.has(task.id);
+            const isLong = note.length > 140 || note.split('\n').length > 2;
+            return `
+                    <div class="mt-2 flex gap-2 rounded-xl bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 px-3 py-2 text-[13px] leading-relaxed ${task.completed ? 'text-slate-400 dark:text-zinc-500' : 'text-slate-600 dark:text-zinc-300'}">
+                        <i class="fa-regular fa-note-sticky mt-[3px] text-xs text-slate-400 dark:text-zinc-500 shrink-0"></i>
+                        <div class="min-w-0 flex-1">
+                            <p class="whitespace-pre-line break-words ${expanded ? '' : 'line-clamp-2'}">${linkifyNote(note)}</p>
+                            ${isLong ? `<button type="button" data-action="toggle-note" class="mt-0.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline">${expanded ? 'Tutup' : 'Selengkapnya'}</button>` : ''}
+                        </div>
+                    </div>`;
+        }
+
+        // Ubah URL di catatan menjadi tautan; setiap potongan teks di-escape terpisah
+        function linkifyNote(text) {
+            const urlRe = /\bhttps?:\/\/[^\s<>"']+[^\s<>"'.,:;!?)\]]/g;
+            let html = '', last = 0, m;
+            while ((m = urlRe.exec(text))) {
+                html += escapeHtml(text.slice(last, m.index));
+                const url = escapeHtml(m[0]);
+                html += `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-brand-600 dark:text-brand-400 underline underline-offset-2 break-all">${url}</a>`;
+                last = m.index + m[0].length;
+            }
+            return html + escapeHtml(text.slice(last));
         }
 
         function renderFocusCard() {
@@ -1702,12 +1796,17 @@ function doPost(e) {
                     case 'progress': toggleTaskInProgress(id); break;
                     case 'edit': editTask(id); break;
                     case 'delete': deleteTask(id); break;
+                    case 'toggle-note':
+                        if (expandedNotes.has(id)) expandedNotes.delete(id); else expandedNotes.add(id);
+                        filterAndRenderTasks();
+                        break;
                 }
             });
         }
 
         // ---------- Countdown ----------
         function tickCountdowns() {
+            updateDocumentTitle();
             document.querySelectorAll('.task-countdown-element').forEach(el => {
                 const inProgress = el.dataset.inProgress === 'true';
                 let remaining = parseInt(el.dataset.remainingMs) || 0;
@@ -1816,6 +1915,7 @@ function doPost(e) {
             appLocked = false; enteredPin = ''; updatePinDots(); lastActivityTime = Date.now();
             $('pin-lock-screen').classList.add('opacity-0', 'pointer-events-none');
             $('pin-lock-screen').setAttribute('aria-hidden', 'true');
+            updateDocumentTitle();
         }
         function lockApp(reason = 'Terkunci otomatis karena tidak ada aktivitas') {
             appLocked = true; enteredPin = ''; updatePinDots();
@@ -1824,6 +1924,7 @@ function doPost(e) {
             $('lock-reason').classList.remove('text-rose-300');
             $('pin-lock-screen').classList.remove('opacity-0', 'pointer-events-none');
             $('pin-lock-screen').setAttribute('aria-hidden', 'false');
+            updateDocumentTitle();
         }
         function logout() { lockApp('Aplikasi dikunci. Masukkan PIN untuk kembali.'); }
 

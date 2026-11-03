@@ -52,6 +52,7 @@ Sesuaikan tampilan aplikasi agar sesuai dengan estetika produktivitas Anda. Semu
 
 * **Tambah Cepat**: Ketik judul lalu tekan Enter, tugas langsung masuk ke kategori aktif. Butuh pengaturan detail? Klik **Detail** untuk membuka panel samping (di HP tampil sebagai *bottom sheet*).
 * **Panel Fokus**: Tugas yang sedang dikerjakan tampil di sidebar dengan timer besar serta tombol Jeda/Selesai.
+* **Catatan Tugas**: Setiap tugas bisa diberi catatan tambahan (detail, link, langkah-langkah). Catatan ikut dicari, tautan otomatis bisa diklik, dan disimpan di kolom `Notes` pada Spreadsheet.
 * **Urungkan Hapus**: Tugas yang terhapus bisa dipulihkan dari notifikasi selama beberapa detik.
 * **Penanda Terlambat**: Tugas yang melewati target tanggal ditandai merah secara otomatis.
 * **Pintasan Keyboard**: `N` tugas baru, `/` cari, `Esc` tutup panel.
@@ -97,7 +98,7 @@ function doGet(e) {
   var db = SpreadsheetApp.getActiveSpreadsheet();
   var taskSheet = db.getSheetByName("TASKS") || db.insertSheet("TASKS");
   var paramSheet = db.getSheetByName("PARAMETER") || db.insertSheet("PARAMETER");
-  
+
   var tasks = [];
   var rows = taskSheet.getDataRange().getValues();
   if(rows.length > 1) {
@@ -105,17 +106,18 @@ function doGet(e) {
       tasks.push({
         id: rows[i][0], title: rows[i][1], priority: rows[i][2],
         duration: rows[i][3], category: rows[i][4], targetDate: rows[i][5],
-        completed: rows[i][6] === true || rows[i][6] === "true"
+        completed: rows[i][6] === true || rows[i][6] === "true",
+        notes: rows[i][7] || ""
       });
     }
   }
-  
+
   var parameters = {};
   var paramData = paramSheet.getRange(1, 1).getValue();
   if (paramData) {
     try { parameters = JSON.parse(paramData); } catch(e) {}
   }
-  
+
   return ContentService.createTextOutput(JSON.stringify({tasks: tasks, parameters: parameters})).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -123,31 +125,34 @@ function doPost(e) {
   var db = SpreadsheetApp.getActiveSpreadsheet();
   var taskSheet = db.getSheetByName("TASKS") || db.insertSheet("TASKS");
   var paramSheet = db.getSheetByName("PARAMETER") || db.insertSheet("PARAMETER");
-  
+
   var data = JSON.parse(e.postData.contents);
   var action = data.action;
-  
+
   if (action === "update_config") {
     paramSheet.getRange(1, 1).setValue(JSON.stringify(data.parameters));
     return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
   }
-  
+
   if (taskSheet.getLastRow() == 0) {
-    taskSheet.appendRow(["ID", "Title", "Priority", "Duration", "Category", "TargetDate", "Completed"]);
+    taskSheet.appendRow(["ID", "Title", "Priority", "Duration", "Category", "TargetDate", "Completed", "Notes"]);
+  } else if (taskSheet.getRange(1, 8).getValue() === "") {
+    taskSheet.getRange(1, 8).setValue("Notes");
   }
   var rows = taskSheet.getDataRange().getValues();
-  
+
   if (action === "create") {
-    taskSheet.appendRow([data.id, data.title, data.priority, data.duration, data.category, data.targetDate, data.completed]);
+    taskSheet.appendRow([data.id, asText(data.title), data.priority, data.duration, data.category, data.targetDate, data.completed, asText(data.notes)]);
   } else if (action === "update") {
     for (var i = 1; i < rows.length; i++) {
       if (rows[i][0] == data.id) {
-        taskSheet.getRange(i + 1, 2).setValue(data.title);
+        taskSheet.getRange(i + 1, 2).setValue(asText(data.title));
         taskSheet.getRange(i + 1, 3).setValue(data.priority);
         taskSheet.getRange(i + 1, 4).setValue(data.duration);
         taskSheet.getRange(i + 1, 5).setValue(data.category);
         taskSheet.getRange(i + 1, 6).setValue(data.targetDate);
         taskSheet.getRange(i + 1, 7).setValue(data.completed);
+        taskSheet.getRange(i + 1, 8).setValue(asText(data.notes));
         break;
       }
     }
@@ -162,6 +167,11 @@ function doPost(e) {
   return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
 }
 
+// Simpan teks apa adanya (cegah teks seperti "=..." dibaca sebagai rumus)
+function asText(value) {
+  var text = value == null ? "" : String(value);
+  return /^[=+\-@]/.test(text) ? "'" + text : text;
+}
 ```
 
 4. Klik tombol **Terapkan (Deploy)** > **Penerapan Baru (New Deployment)**.
@@ -170,6 +180,8 @@ function doPost(e) {
 7. Klik Deploy, lalu salin **URL Web App** yang diberikan.
 8. Buka kembali aplikasi Prioritask Anda, klik tombol indikator **"Penyimpanan lokal"** di menu atas.
 9. Paste URL Web App tersebut ke dalam kolom yang tersedia dan simpan.
+
+> **Sudah memakai versi lama skripnya?** Tempel ulang skrip di atas, lalu buka **Terapkan > Kelola penerapan > Edit (ikon pensil) > Versi: Versi baru > Terapkan** agar URL lama tetap dipakai. Tanpa langkah ini, catatan tugas hanya tersimpan di browser.
 
 Kini data Anda akan tersinkronisasi otomatis dengan Google Spreadsheet pada dua tab berbeda: `TASKS` (untuk daftar tugas) dan `PARAMETER` (untuk JSON konfigurasi kustom).
 
