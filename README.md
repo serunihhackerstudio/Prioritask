@@ -48,10 +48,22 @@ Sesuaikan tampilan aplikasi agar sesuai dengan estetika produktivitas Anda. Semu
 
 ---
 
+### 6. ✨ Desain Baru yang Lebih Segar & Mudah Digunakan
+
+* **Tambah Cepat**: Ketik judul lalu tekan Enter, tugas langsung masuk ke kategori aktif. Butuh pengaturan detail? Klik **Detail** untuk membuka panel samping (di HP tampil sebagai *bottom sheet*).
+* **Panel Fokus**: Tugas yang sedang dikerjakan tampil di sidebar dengan timer besar serta tombol Jeda/Selesai.
+* **Urungkan Hapus**: Tugas yang terhapus bisa dipulihkan dari notifikasi selama beberapa detik.
+* **Penanda Terlambat**: Tugas yang melewati target tanggal ditandai merah secara otomatis.
+* **Pintasan Keyboard**: `N` tugas baru, `/` cari, `Esc` tutup panel.
+* **Ramah HP**: Tombol tambah melayang (FAB), kontrol berukuran sentuh, dan tata letak satu kolom.
+
+---
+
 ## 🛠️ Teknologi yang Digunakan
 
 * **Markup & Layout**: HTML5 Semantik.
 * **Styling**: [Tailwind CSS v3](https://tailwindcss.com/) (dimuat via CDN dengan injeksi konfigurasi kustom JIT).
+* **Tipografi**: [Plus Jakarta Sans](https://fonts.google.com/specimen/Plus+Jakarta+Sans) dari Google Fonts.
 * **Logika & Fungsionalitas**: Vanilla JavaScript (ES6+).
 * **Ikonografi**: [FontAwesome v6](https://fontawesome.com/).
 * **Animasi Tambahan**: [Canvas Confetti](https://www.kirilv.com/canvas-confetti/) (untuk efek perayaan saat tugas selesai).
@@ -156,7 +168,7 @@ function doPost(e) {
 5. Pilih jenis (Select type): **Aplikasi Web (Web App)**.
 6. Akses: Ubah menjadi **Siapa saja (Anyone)**.
 7. Klik Deploy, lalu salin **URL Web App** yang diberikan.
-8. Buka kembali aplikasi Prioritask Anda, klik tombol indikator **"Penyimpanan Lokal"** di menu atas.
+8. Buka kembali aplikasi Prioritask Anda, klik tombol indikator **"Penyimpanan lokal"** di menu atas.
 9. Paste URL Web App tersebut ke dalam kolom yang tersedia dan simpan.
 
 Kini data Anda akan tersinkronisasi otomatis dengan Google Spreadsheet pada dua tab berbeda: `TASKS` (untuk daftar tugas) dan `PARAMETER` (untuk JSON konfigurasi kustom).
@@ -168,4 +180,5 @@ Kini data Anda akan tersinkronisasi otomatis dengan Google Spreadsheet pada dua 
 Bagi pengembang yang ingin memodifikasi kode UI:
 
 * **Warna Bawaan CSS**: Anda bisa mengatur warna bawaan dasar sebelum Javascript berjalan pada blok `<style>` di tag `:root`.
-* **Struktur Modal**: Setiap Modal (Pin Lock, App Settings, Database, Clear Tasks) menggunakan z-index yang terstratifikasi (`z-50`) untuk menjamin tidak ada konflik *overlap*.
+* **Komponen UI**: Kelas komponen (`.card`, `.btn`, `.chip`, `.input`, `.task-card`, dll.) didefinisikan di blok `<style type="text/tailwindcss">` sehingga mudah diubah dari satu tempat.
+* **Struktur Modal**: Semua modal & panel memakai kelas `.modal` (dibuka dengan `openModal(id)`), bisa ditutup dengan `Esc` atau klik area luar. Layar kunci PIN berada di lapisan paling atas (`z-[60]`).
