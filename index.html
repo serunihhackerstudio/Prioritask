@@ -42,6 +42,11 @@
                         },
                         accent: {
                             500: 'rgb(var(--color-accent-500) / <alpha-value>)',
+                        },
+                        // Palet mode gelap (zinc hanya dipakai lewat dark:), dibuat lebih terang
+                        zinc: {
+                            50: '#f6f8fb', 100: '#eef2f7', 200: '#dde3ec', 300: '#c6cfdc', 400: '#a7b2c4',
+                            500: '#8794aa', 600: '#5d6a81', 700: '#46536b', 800: '#334058', 900: '#283349', 950: '#1f2839'
                         }
                     }
                 }
@@ -85,8 +90,8 @@
         }
         .dark .bg-app {
             background:
-                radial-gradient(1000px 480px at -10% -10%, rgb(var(--color-brand-500) / 0.14), transparent 60%),
-                #09090b;
+                radial-gradient(1000px 480px at -10% -10%, rgb(var(--color-brand-500) / 0.16), transparent 60%),
+                #1c2434;
             background-attachment: fixed;
         }
 
@@ -138,7 +143,7 @@
             animation: shimmer 1.4s infinite;
         }
         .dark .shimmer {
-            background: linear-gradient(90deg, #18181b 25%, #27272a 50%, #18181b 75%);
+            background: linear-gradient(90deg, #283349 25%, #334058 50%, #283349 75%);
             background-size: 200% 100%;
         }
 
